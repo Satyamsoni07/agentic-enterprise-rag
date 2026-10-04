@@ -41,13 +41,17 @@ for question in questions:
         "verification_supported": False,
         "verification_reason": "",
 
-        "correction_attempts": 0
+        "correction_attempts": 0,
+        "execution_trace": []
 
     }
 
     result = routing_graph.invoke(
         initial_state
     )
+
+    print("\nEXECUTION TRACE:")
+    print(result["execution_trace"])
 
     print("\nROUTE:")
     print(result["route"])

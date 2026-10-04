@@ -33,6 +33,8 @@ class RouterState(TypedDict):
 
     correction_attempts: int
 
+    execution_trace: list
+
 
 # 2. Router node
 def router_node(state: RouterState) -> dict:
@@ -42,7 +44,11 @@ def router_node(state: RouterState) -> dict:
     route = classify_route(question)
 
     return {
-        "route": route
+        "route": route,
+        "execution_trace": (
+            state["execution_trace"]
+            + ["router"]
+        )
     }
 
 
@@ -57,7 +63,11 @@ def rag_node(state: RouterState) -> dict:
         "answer": result["answer"],
         "sources": result["sources"],
         "sql": "",
-        "sql_result": []
+        "sql_result": [],
+        "execution_trace": (
+            state["execution_trace"]
+            + ["rag"]
+        )
     }
 
 
@@ -75,14 +85,22 @@ def sql_node(state: RouterState) -> dict:
             ),
             "sources": [],
             "sql": result["sql"],
-            "sql_result": []
+            "sql_result": [],
+            "execution_trace": (
+                state["execution_trace"]
+                + ["sql"]
+            )
         }
 
     return {
         "answer": result["answer"],
         "sources": [],
         "sql": result["sql"],
-        "sql_result": result["result"]
+        "sql_result": result["result"],
+        "execution_trace": (
+            state["execution_trace"]
+            + ["sql"]
+        )
     }
 
 
@@ -95,7 +113,11 @@ def planner_node(state: RouterState) -> dict:
 
     return {
         "rag_question": plan["rag_question"],
-        "sql_question": plan["sql_question"]
+        "sql_question": plan["sql_question"],
+        "execution_trace": (
+            state["execution_trace"]
+            + ["planner"]
+        )
     }
 
 
@@ -108,7 +130,11 @@ def combined_rag_node(state: RouterState) -> dict:
 
     return {
         "rag_answer": result["answer"],
-        "sources": result["sources"]
+        "sources": result["sources"],
+        "execution_trace": (
+            state["execution_trace"]
+            + ["combined_rag"]
+        )
     }
 
 
@@ -125,13 +151,21 @@ def combined_sql_node(state: RouterState) -> dict:
                 f"SQL tool failed: {result['error']}"
             ),
             "sql": result["sql"],
-            "sql_result": []
+            "sql_result": [],
+            "execution_trace": (
+                state["execution_trace"]
+                + ["combined_sql"]
+            )
         }
 
     return {
         "sql_answer": result["answer"],
         "sql": result["sql"],
-        "sql_result": result["result"]
+        "sql_result": result["result"],
+        "execution_trace": (
+            state["execution_trace"]
+            + ["combined_sql"]
+        )
     }
 
 
@@ -181,7 +215,11 @@ Create the final combined answer.
     )
 
     return {
-        "answer": answer.strip()
+        "answer": answer.strip(),
+        "execution_trace": (
+            state["execution_trace"]
+            + ["synthesis"]
+        )
     }
 
 
@@ -225,7 +263,11 @@ def verifier_node(state: RouterState) -> dict:
         ],
         "verification_reason": verification[
             "reason"
-        ]
+        ],
+        "execution_trace": (
+            state["execution_trace"]
+            + ["verifier"]
+        )
     }
 
 
@@ -264,6 +306,10 @@ def corrector_node(state: RouterState) -> dict:
         "answer": corrected_answer,
         "correction_attempts": (
             state["correction_attempts"] + 1
+        ),
+        "execution_trace": (
+            state["execution_trace"]
+            + ["corrector"]
         )
     }
 
@@ -275,6 +321,10 @@ def safe_stop_node(state: RouterState) -> dict:
         "answer": (
             "I could not produce a sufficiently verified "
             "answer from the available evidence."
+        ),
+        "execution_trace": (
+            state["execution_trace"]
+            + ["safe_stop"]
         )
     }
 
