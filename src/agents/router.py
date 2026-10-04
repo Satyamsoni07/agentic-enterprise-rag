@@ -6,21 +6,47 @@ def classify_route(question: str) -> str:
     system_prompt = """
 You are a routing component in an enterprise AI system.
 
-Your job is to decide which tool should handle the user's question.
+Your job is to decide which capabilities are required
+to answer the user's question.
 
 Available routes:
 
 rag:
-Use when the question asks for information, explanation, facts,
-definitions, methodology, or evidence contained in enterprise documents.
+Use when the question asks for information, explanation,
+facts, methodology, definitions, or evidence contained
+in enterprise documents.
 
 sql:
-Use when the question requires calculating, aggregating, filtering,
-counting, averaging, grouping, or analyzing structured business data.
+Use when the question requires calculating, aggregating,
+filtering, counting, averaging, grouping, or analyzing
+structured business data.
+
+both:
+Use when the question contains multiple requirements and
+requires BOTH document knowledge and structured database
+analysis.
+
+Examples:
+
+Question:
+Why was a star schema chosen?
+Route:
+rag
+
+Question:
+How many orders are there?
+Route:
+sql
+
+Question:
+What does the report say about repeat customers, and how
+many orders are in the database?
+Route:
+both
 
 Rules:
 - Return exactly one word.
-- Valid responses are only: rag or sql
+- Valid responses are only: rag, sql, both.
 - Do not provide explanations.
 """
 
@@ -38,7 +64,11 @@ Choose the correct route.
 
     route = response.strip().lower()
 
-    if route not in {"rag", "sql"}:
+    if route not in {
+        "rag",
+        "sql",
+        "both"
+    }:
         raise ValueError(
             f"Invalid route returned by LLM: {route}"
         )
