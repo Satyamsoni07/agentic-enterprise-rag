@@ -1,0 +1,42 @@
+[
+    {
+        "question": "Why was a star schema chosen for the project?",
+        "expected_pages": [2, 32]
+    },
+    {
+        "question": "How were repeat customers identified in the project?",
+        "expected_pages": [5, 33]
+    },
+    {
+        "question": "Why was synthetic data created for funnel, marketing, and experiment analysis?",
+        "expected_pages": [7, 8, 33]
+    },
+    {
+        "question": "What was the biggest drop-off in the conversion funnel?",
+        "expected_pages": [4, 9, 18, 33]
+    },
+    {
+        "question": "Why was a Sample Ratio Mismatch check performed before analyzing the A/B experiment?",
+        "expected_pages": [11, 33]
+    },
+    {
+        "question": "What statistical test was used to compare the control and treatment conversion rates?",
+        "expected_pages": [11, 12, 33]
+    },
+    {
+        "question": "How did the project prevent double counting when tables had different data grains?",
+        "expected_pages": [15, 16, 34]
+    },
+    {
+        "question": "Why is transaction value called GMV instead of revenue?",
+        "expected_pages": [21, 22, 34]
+    },
+    {
+        "question": "Why was Power BI Import mode used instead of DirectQuery?",
+        "expected_pages": [25, 35]
+    },
+    {
+        "question": "How were dbt models divided between views and tables?",
+        "expected_pages": [31, 32, 36]
+    }
+]

@@ -1,3 +1,10 @@
 python-dotenv
 pydantic
 openai
+ollama
+langchain-text-splitters
+chromadb
+pypdf
+sentence-transformers
+rank-bm25
+langgraph
