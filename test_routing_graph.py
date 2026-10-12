@@ -1,4 +1,6 @@
+
 from src.agents.routing_graph import routing_graph
+from src.utils.timer import start_timer, elapsed_time
 
 
 questions = [
@@ -43,12 +45,16 @@ for question in questions:
 
         "correction_attempts": 0,
         "execution_trace": []
-
     }
 
-    result = routing_graph.invoke(
-        initial_state
-    )
+    # Start measuring total agent execution time
+    start = start_timer()
+
+    # Execute the complete LangGraph workflow
+    result = routing_graph.invoke(initial_state)
+
+    # Calculate total execution time
+    total_duration = elapsed_time(start)
 
     print("\nEXECUTION TRACE:")
     print(result["execution_trace"])
@@ -96,3 +102,7 @@ for question in questions:
 
         print("\nVERIFICATION REASON:")
         print(result["verification_reason"])
+
+    # Display total end-to-end agent latency
+    print("\nTOTAL AGENT EXECUTION TIME:")
+    print(f"{total_duration:.3f} seconds")

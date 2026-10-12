@@ -1,6 +1,7 @@
 from typing import TypedDict
 
 from langgraph.graph import StateGraph, START, END
+from src.utils.logger import get_logger
 
 from src.rag.pipeline import answer_question
 from src.agents.router import classify_route
@@ -9,7 +10,9 @@ from src.tools.sql_agent_tool import run_sql_tool
 from src.llm.provider import generate_response
 from src.agents.verifier import verify_answer
 from src.agents.corrector import correct_answer
+from src.utils.timer import start_timer, elapsed_time
 
+logger = get_logger(__name__)
 
 # 1. Define state
 class RouterState(TypedDict):
@@ -36,12 +39,41 @@ class RouterState(TypedDict):
     execution_trace: list
 
 
+
 # 2. Router node
 def router_node(state: RouterState) -> dict:
 
     question = state["question"]
 
-    route = classify_route(question)
+    logger.info("Router classification started")
+
+    # Start measuring router execution time
+    start = start_timer()
+
+    try:
+        route = classify_route(question)
+
+    except Exception:
+        duration = elapsed_time(start)
+
+        logger.exception(
+            "Router classification failed after %.3f seconds",
+            duration
+        )
+        raise
+
+    # Calculate router latency
+    duration = elapsed_time(start)
+
+    logger.info(
+        "Router classification time: %.3f seconds",
+        duration
+    )
+
+    logger.info(
+        "Router selected route: %s",
+        route
+    )
 
     return {
         "route": route,
@@ -52,12 +84,26 @@ def router_node(state: RouterState) -> dict:
     }
 
 
+
 # 3. Normal RAG node
 def rag_node(state: RouterState) -> dict:
 
     question = state["question"]
 
+    logger.info("RAG retrieval started")
+
+    start = start_timer()
+
     result = answer_question(question)
+
+    duration = elapsed_time(start)
+
+    logger.info("RAG retrieval completed")
+
+    logger.info(
+        "RAG execution time: %.3f seconds",
+        duration
+    )
 
     return {
         "answer": result["answer"],
@@ -71,14 +117,44 @@ def rag_node(state: RouterState) -> dict:
     }
 
 
+
+
+
 # 4. Normal SQL node
 def sql_node(state: RouterState) -> dict:
 
     question = state["question"]
 
-    result = run_sql_tool(question)
+    logger.info("SQL execution started")
+
+    start = start_timer()
+
+    try:
+        result = run_sql_tool(question)
+
+    except Exception:
+        duration = elapsed_time(start)
+
+        logger.exception(
+            "SQL tool raised an exception after %.3f seconds",
+            duration
+        )
+        raise
+
+    duration = elapsed_time(start)
+
+    logger.info(
+        "SQL execution time: %.3f seconds",
+        duration
+    )
 
     if not result["success"]:
+
+        logger.warning(
+            "SQL execution failed: %s",
+            result["error"]
+        )
+
         return {
             "answer": (
                 f"SQL tool failed: {result['error']}"
@@ -92,6 +168,8 @@ def sql_node(state: RouterState) -> dict:
             )
         }
 
+    logger.info("SQL execution completed successfully")
+
     return {
         "answer": result["answer"],
         "sources": [],
@@ -104,12 +182,36 @@ def sql_node(state: RouterState) -> dict:
     }
 
 
+
 # 5. Planner node for BOTH route
 def planner_node(state: RouterState) -> dict:
 
     question = state["question"]
 
-    plan = decompose_question(question)
+    logger.info("Question decomposition started")
+
+    # Start measuring planner latency
+    start = start_timer()
+
+    try:
+        plan = decompose_question(question)
+
+    except Exception:
+        duration = elapsed_time(start)
+
+        logger.exception(
+            "Question decomposition failed after %.3f seconds",
+            duration
+        )
+        raise
+
+    # Calculate planner execution time
+    duration = elapsed_time(start)
+
+    logger.info(
+        "Question decomposition completed in %.3f seconds",
+        duration
+    )
 
     return {
         "rag_question": plan["rag_question"],
@@ -121,12 +223,42 @@ def planner_node(state: RouterState) -> dict:
     }
 
 
+
+
 # 6. RAG node for BOTH route
 def combined_rag_node(state: RouterState) -> dict:
 
     question = state["rag_question"]
 
-    result = answer_question(question)
+    logger.info("Combined RAG retrieval started")
+
+    start = start_timer()
+
+    try:
+        result = answer_question(question)
+
+    except Exception:
+        duration = elapsed_time(start)
+
+        logger.exception(
+            "Combined RAG failed after %.3f seconds",
+            duration
+        )
+        raise
+
+    duration = elapsed_time(start)
+
+    logger.info("Combined RAG retrieval completed")
+
+    logger.info(
+        "Combined RAG execution time: %.3f seconds",
+        duration
+    )
+
+    logger.info(
+        "Number of retrieved sources: %d",
+        len(result["sources"])
+    )
 
     return {
         "rag_answer": result["answer"],
@@ -138,14 +270,44 @@ def combined_rag_node(state: RouterState) -> dict:
     }
 
 
+
+
+
 # 7. SQL node for BOTH route
 def combined_sql_node(state: RouterState) -> dict:
 
     question = state["sql_question"]
 
-    result = run_sql_tool(question)
+    logger.info("Combined SQL execution started")
+
+    start = start_timer()
+
+    try:
+        result = run_sql_tool(question)
+
+    except Exception:
+        duration = elapsed_time(start)
+
+        logger.exception(
+            "Combined SQL failed after %.3f seconds",
+            duration
+        )
+        raise
+
+    duration = elapsed_time(start)
+
+    logger.info(
+        "Combined SQL execution time: %.3f seconds",
+        duration
+    )
 
     if not result["success"]:
+
+        logger.warning(
+            "Combined SQL execution failed: %s",
+            result["error"]
+        )
+
         return {
             "sql_answer": (
                 f"SQL tool failed: {result['error']}"
@@ -158,6 +320,15 @@ def combined_sql_node(state: RouterState) -> dict:
             )
         }
 
+    logger.info(
+        "Combined SQL execution completed successfully"
+    )
+
+    logger.info(
+        "Number of SQL result rows: %d",
+        len(result["result"])
+    )
+
     return {
         "sql_answer": result["answer"],
         "sql": result["sql"],
@@ -169,12 +340,16 @@ def combined_sql_node(state: RouterState) -> dict:
     }
 
 
+
+
 # 8. Final synthesis node
 def synthesis_node(state: RouterState) -> dict:
 
     original_question = state["question"]
     rag_answer = state["rag_answer"]
     sql_answer = state["sql_answer"]
+
+    logger.info("Answer synthesis started")
 
     system_prompt = """
 You are the final synthesis component of an enterprise AI system.
@@ -209,9 +384,30 @@ SQL answer:
 Create the final combined answer.
 """
 
-    answer = generate_response(
-        user_prompt,
-        system_prompt
+    # Start measuring synthesis latency
+    start = start_timer()
+
+    try:
+        answer = generate_response(
+            user_prompt,
+            system_prompt
+        )
+
+    except Exception:
+        duration = elapsed_time(start)
+
+        logger.exception(
+            "Answer synthesis failed after %.3f seconds",
+            duration
+        )
+        raise
+
+    # Calculate execution time
+    duration = elapsed_time(start)
+
+    logger.info(
+        "Answer synthesis completed in %.3f seconds",
+        duration
     )
 
     return {
@@ -246,24 +442,57 @@ Raw SQL result:
     return evidence
 
 
+
+
 # 10. Verifier node
 def verifier_node(state: RouterState) -> dict:
 
+    logger.info("Answer verification started")
+
     evidence = build_combined_evidence(state)
 
-    verification = verify_answer(
-        question=state["question"],
-        evidence=evidence,
-        answer=state["answer"]
+    start = start_timer()
+
+    try:
+        verification = verify_answer(
+            question=state["question"],
+            evidence=evidence,
+            answer=state["answer"]
+        )
+
+    except Exception:
+        duration = elapsed_time(start)
+
+        logger.exception(
+            "Answer verification raised an error after %.3f seconds",
+            duration
+        )
+        raise
+
+    duration = elapsed_time(start)
+
+    logger.info(
+        "Answer verification time: %.3f seconds",
+        duration
     )
 
+    supported = verification["supported"]
+    reason = verification["reason"]
+
+    if supported:
+        logger.info("Answer verification passed")
+
+    else:
+        logger.warning("Answer verification failed")
+
+        logger.warning(
+            "Verification reason: %s",
+            reason
+        )
+
     return {
-        "verification_supported": verification[
-            "supported"
-        ],
-        "verification_reason": verification[
-            "reason"
-        ],
+        "verification_supported": supported,
+        "verification_reason": reason,
         "execution_trace": (
             state["execution_trace"]
             + ["verifier"]
@@ -288,25 +517,54 @@ def choose_verification_route(
     return "correct"
 
 
+
+# 12. Corrector node
+
 # 12. Corrector node
 def corrector_node(state: RouterState) -> dict:
 
+    attempt_number = state["correction_attempts"] + 1
+
+    logger.info(
+        "Answer correction started | Attempt: %d",
+        attempt_number
+    )
+
     evidence = build_combined_evidence(state)
 
-    corrected_answer = correct_answer(
-        question=state["question"],
-        evidence=evidence,
-        answer=state["answer"],
-        verification_reason=state[
-            "verification_reason"
-        ]
+    start = start_timer()
+
+    try:
+        corrected_answer = correct_answer(
+            question=state["question"],
+            evidence=evidence,
+            answer=state["answer"],
+            verification_reason=state[
+                "verification_reason"
+            ]
+        )
+
+    except Exception:
+        duration = elapsed_time(start)
+
+        logger.exception(
+            "Answer correction failed after %.3f seconds | Attempt: %d",
+            duration,
+            attempt_number
+        )
+        raise
+
+    duration = elapsed_time(start)
+
+    logger.info(
+        "Answer correction completed in %.3f seconds | Attempt: %d",
+        duration,
+        attempt_number
     )
 
     return {
         "answer": corrected_answer,
-        "correction_attempts": (
-            state["correction_attempts"] + 1
-        ),
+        "correction_attempts": attempt_number,
         "execution_trace": (
             state["execution_trace"]
             + ["corrector"]
@@ -314,8 +572,15 @@ def corrector_node(state: RouterState) -> dict:
     }
 
 
+
 # 13. Safe-stop node
 def safe_stop_node(state: RouterState) -> dict:
+
+    logger.warning(
+        "Agent stopped: Answer remains unsupported "
+        "after %d correction attempt(s)",
+        state["correction_attempts"]
+    )
 
     return {
         "answer": (
@@ -327,7 +592,6 @@ def safe_stop_node(state: RouterState) -> dict:
             + ["safe_stop"]
         )
     }
-
 
 # 14. Main routing function
 def choose_route(state: RouterState) -> str:

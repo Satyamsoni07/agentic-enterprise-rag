@@ -1,6 +1,13 @@
+
 from src.rag.retriever import retrieve_documents
 from src.rag.reranker import rerank_documents
 from src.llm.provider import generate_response
+
+from src.utils.logger import get_logger
+from src.utils.timer import start_timer, elapsed_time
+
+
+logger = get_logger(__name__)
 
 
 def answer_question(
@@ -11,10 +18,32 @@ def answer_question(
 ) -> dict:
 
     # 1. Retrieve candidate documents using vector search
-    retrieved_documents = retrieve_documents(
-        question=question,
-        top_k=retrieval_k,
-        max_distance=max_distance
+    logger.info("Vector retrieval started")
+
+    start = start_timer()
+
+    try:
+        retrieved_documents = retrieve_documents(
+            question=question,
+            top_k=retrieval_k,
+            max_distance=max_distance
+        )
+
+    except Exception:
+        logger.exception(
+            "Vector retrieval failed after %.3f seconds",
+            elapsed_time(start)
+        )
+        raise
+
+    logger.info(
+        "Vector retrieval completed in %.3f seconds",
+        elapsed_time(start)
+    )
+
+    logger.info(
+        "Number of retrieved candidates: %d",
+        len(retrieved_documents)
     )
 
     # If vector search finds no documents
@@ -28,11 +57,33 @@ def answer_question(
         }
 
     # 2. Rerank the retrieved candidate documents
-    retrieved_documents = rerank_documents(
-        question=question,
-        documents=retrieved_documents,
-        top_k=final_k,
-        min_score=0.0
+    logger.info("Cross-encoder reranking started")
+
+    start = start_timer()
+
+    try:
+        retrieved_documents = rerank_documents(
+            question=question,
+            documents=retrieved_documents,
+            top_k=final_k,
+            min_score=0.0
+        )
+
+    except Exception:
+        logger.exception(
+            "Reranking failed after %.3f seconds",
+            elapsed_time(start)
+        )
+        raise
+
+    logger.info(
+        "Cross-encoder reranking completed in %.3f seconds",
+        elapsed_time(start)
+    )
+
+    logger.info(
+        "Number of selected chunks: %d",
+        len(retrieved_documents)
     )
 
     # If reranker rejects all documents
@@ -102,9 +153,26 @@ Question:
 """
 
     # 6. Generate the final grounded answer
-    answer = generate_response(
-        user_prompt,
-        system_prompt
+    logger.info("RAG LLM generation started")
+
+    start = start_timer()
+
+    try:
+        answer = generate_response(
+            user_prompt,
+            system_prompt
+        )
+
+    except Exception:
+        logger.exception(
+            "RAG LLM generation failed after %.3f seconds",
+            elapsed_time(start)
+        )
+        raise
+
+    logger.info(
+        "RAG LLM generation completed in %.3f seconds",
+        elapsed_time(start)
     )
 
     # 7. Collect sources in the same order
